@@ -129,7 +129,7 @@ dmypy.json
 .pyre/
 
 # Notebook development and testing
-testing/*
+dev/*
 *.ipynb
 
 # Data storage
