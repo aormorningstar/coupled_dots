@@ -147,6 +147,7 @@ plots/*
 # Notes
 notes/*
 *.lyx
+*.lyx~
 *.pdf
 
 # DS_Store

@@ -4,77 +4,93 @@ import sys
 sys.path.append("../")
 from src.coupled_dots import *
 
-# size of system
-N1 = 1
-N2 = 500
-N = N1 + N2
+"""In these simulations we fix N1 = 1 so that we have one state decaying into
+a dot. We can choose GOE, GUE, or GSE Hamiltonians.
+"""
+
+# system size
+N = int(sys.argv[1])
+# ensemble
+ensemble = str(sys.argv[2])
 # coupling between the dots
-ngammas = 20
-gammas = 10**np.linspace(-4, 3, ngammas)
-gs = gammas * N1 / N2
+ngammas = 10
+gammas = np.logspace(-np.log10(N), np.log10(N), ngammas)
+gs = gammas / N
 # number of samples
 nsamples = 500
-# number of time points
+# time points
 nts = 100
+# chosen states (these work for all ensembles)
+k1, k2a, k2b = 0, 2, 4
 
 for gamma, g in zip(gammas, gs):
-  # Fermi's Golden Rule timescale
-  t_fgr = 1 / g
-  # times to record
-  tf = t_fgr * 10
-  ts = np.linspace(0, tf, nts)
-  # Tobias' approximate result for P1
-  P1_inf_tobias = tobias_approx_result(N1, N2, g)
+  # times
+  ti = 0.1 * g
+  tf = 5 * max(2 * N, N / np.sqrt(gamma))
+  ts = np.logspace(np.log10(ti), np.log10(tf), nts)
   # for storing results
   data = {
     'E': [],
-    'P(E)': [],
-    'P1(inf)': [],
-    'P1(t)': [],
+    'P1(E)': [],
+    'P2(E)': [],
+    'P11(inf)': [],
+    'P22(inf)': [],
+    'P22b(inf)': [],
+    'P11(t)': [],
+    'P22(t)': [],
+    'P22b(t)': [],
     't': ts,
   }
   for sample in range(nsamples):
     # sample the Hamiltonian
-    H = hamiltonian(N1, N2, g)
-    # initial state
-    psi = initial_state(N1, N2)
+    H = hamiltonian(N, g, ensemble)
     # energy eigenstates
     E, V = np.linalg.eigh(H)
 
-    # <E|psi> = sum_i <E|i><i|psi>
-    amp_psi_E = V.T.conj().dot(psi)
-    # |<E|psi>|^2
-    prob_psi_E = np.abs(amp_psi_E)**2
-    # |<i|E>|^2
-    prob_i_E = np.abs(V)**2
-    # sum_E |<i|E>|^2 |<E|psi>|^2
-    prob_psi_i = prob_i_E.dot(prob_psi_E)
-    # prob first dot at infinite time
-    P1_inf = prob_psi_i[:N1].sum()
-    # time evolution of P1
-    A_i_E = np.einsum("iE,E->iE", V[:N1], amp_psi_E)
-    P1_t = np.zeros_like(ts)
-    for j in range(len(ts)):
-      amp_i_psit = A_i_E.dot(np.exp(-1j * E * ts[j]))
-      P1_t[j] = np.vdot(amp_i_psit, amp_i_psit).real
+    # <E|i>
+    amp_1_E = V[k1].conj()
+    amp_2a_E = V[k2a].conj()
+    amp_2b_E = V[k2b].conj()
+    # |<E|i>|^2
+    prob_1_E = np.abs(amp_1_E)**2
+    prob_2a_E = np.abs(amp_2a_E)**2
+    prob_2b_E = np.abs(amp_2b_E)**2
+    # infinite time transition probabilities
+    T11_inf = np.dot(prob_1_E, prob_1_E)
+    T2a2a_inf = np.dot(prob_2a_E, prob_2a_E)
+    T2a2b_inf = np.dot(prob_2a_E, prob_2b_E)
+
+    # time-dependent transition probabilities
+    T11_t = np.zeros_like(ts)
+    T2a2a_t = np.zeros_like(ts)
+    T2a2b_t = np.zeros_like(ts)
+    for j, t in enumerate(ts):
+      phases = np.exp(-1j * E * t)
+      T11_t[j] = np.abs(np.sum(phases * amp_1_E * amp_1_E.conj()))**2
+      T2a2a_t[j] = np.abs(np.sum(phases * amp_2a_E * amp_2a_E.conj()))**2
+      T2a2b_t[j] = np.abs(np.sum(phases * amp_2a_E * amp_2b_E.conj()))**2
 
     # record data
     data['E'].append(E)
-    data['P(E)'].append(prob_psi_E)
-    data['P1(inf)'].append(P1_inf)
-    data['P1(t)'].append(P1_t)
+    data['P1(E)'].append(prob_1_E)
+    data['P2(E)'].append(prob_2a_E)
+    data['P11(inf)'].append(T11_inf)
+    data['P22(inf)'].append(T2a2a_inf)
+    data['P22b(inf)'].append(T2a2b_inf)
+    data['P11(t)'].append(T11_t)
+    data['P22(t)'].append(T2a2a_t)
+    data['P22b(t)'].append(T2a2b_t)
 
   # save data
   barcode = str(np.random.rand())[2:8]
   # dir = "/scratch/gpfs/aorm/coupled_dots"
   dir = "../data"
-  fname = f"{dir}/N1={N1}_N2={N2}_gamma={gamma}_{barcode}.hdf5"
+  fname = f"{dir}/N={N}_ensemble={ensemble}_gamma={np.round(gamma, 6)}_{barcode}.hdf5"
   f = h5py.File(fname, "w")
-  f.attrs['N1'] = N1
-  f.attrs['N2'] = N2
+  f.attrs['N'] = N
   f.attrs['gamma'] = gamma
   f.attrs['g'] = g
-  f.attrs['Tobias P1(inf)'] = P1_inf_tobias,
+  f.attrs['ensemble'] = ensemble
   for ky in data.keys():
     f.create_dataset(ky, data=data[ky])
   f.close()
