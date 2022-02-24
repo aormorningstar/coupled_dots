@@ -17,9 +17,9 @@ ngammas = 10
 gammas = np.logspace(-np.log10(N), np.log10(N), ngammas)
 gs = gammas / N
 # number of samples
-nsamples = 500
+nsamples = 1000
 # time points
-nts = 100
+nts = 250
 # chosen states (these work for all ensembles)
 k1, k2a, k2b = 0, 2, 4
 
@@ -32,7 +32,6 @@ for gamma, g in zip(gammas, gs):
   data = {
     'E': [],
     'P1(E)': [],
-    'P2(E)': [],
     'P11(inf)': [],
     'P22(inf)': [],
     'P22b(inf)': [],
@@ -40,6 +39,8 @@ for gamma, g in zip(gammas, gs):
     'P22(t)': [],
     'P22b(t)': [],
     't': ts,
+    'analytic P11(inf)': final_p_res(N, g),
+    'analytic P11(t)': p_res(ts, N, g),
   }
   for sample in range(nsamples):
     # sample the Hamiltonian
@@ -73,7 +74,6 @@ for gamma, g in zip(gammas, gs):
     # record data
     data['E'].append(E)
     data['P1(E)'].append(prob_1_E)
-    data['P2(E)'].append(prob_2a_E)
     data['P11(inf)'].append(T11_inf)
     data['P22(inf)'].append(T2a2a_inf)
     data['P22b(inf)'].append(T2a2b_inf)
